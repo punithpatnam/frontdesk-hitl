@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎤 Voice Diagnostic Tool</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 { color: #667eea; margin-bottom: 12px; font-size: 32px; }
+    .subtitle { color: #666; margin-bottom: 32px; font-size: 16px; }
+    .test-section {
+      background: #f8f9fa;
+      padding: 24px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      border-left: 4px solid #667eea;
+    }
+    .test-section h2 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .status.pending { background: #fef3c7; color: #92400e; }
+    .status.success { background: #d1fae5; color: #065f46; }
+    .status.error { background: #fee2e2; color: #991b1b; }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-right: 8px;
+    }
+    button:hover { background: #5568d3; transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    button:disabled { background: #cbd5e0; cursor: not-allowed; transform: none; }
+    .log {
+      background: #1a202c;
+      color: #68d391;
+      padding: 16px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 12px;
+      line-height: 1.6;
+    }
+    .log-line { margin-bottom: 4px; }
+    .error { color: #fc8181; }
+    .success { color: #68d391; }
+    .info { color: #63b3ed; }
+    .warning { color: #f6ad55; }
+    #volumeMeter {
+      width: 100%;
+      height: 40px;
+      background: #e2e8f0;
+      border-radius: 8px;
+      margin-top: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+    #volumeBar {
+      height: 100%;
+      background: linear-gradient(90deg, #68d391 0%, #38b2ac 100%);
+      width: 0%;
+      transition: width 0.1s;
+    }
+    .checklist {
+      margin-top: 16px;
+    }
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      padding: 8px;
+      border-radius: 6px;
+    }
+    .check-item.checked { background: #d1fae5; color: #065f46; }
+    .check-item.unchecked { background: #fee2e2; color: #991b1b; }
+    .check-item.pending { background: #fef3c7; color: #92400e; }
+    code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #e53e3e;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎤 Voice Diagnostic Tool</h1>
+    <p class="subtitle">Test your microphone and LiveKit connection step by step</p>
+
+    <!-- Test 1: Microphone Permission -->
+    <div class="test-section">
+      <h2>🔐 Test 1: Microphone Permission</h2>
+      <div id="micStatus" class="status pending">⏳ Not tested</div>
+      <button onclick="testMicrophone()">Test Microphone</button>
+      <div id="volumeMeter" style="display:none;">
+        <div id="volumeBar"></div>
+      </div>
+      <div id="micLog" class="log" style="display:none;"></div>
+    </div>
+
+    <!-- Test 2: Backend Connection -->
+    <div class="test-section">
+      <h2>🔌 Test 2: Backend API</h2>
+      <div id="backendStatus" class="status pending">⏳ Not tested</div>
+      <button onclick="testBackend()">Test Backend</button>
+      <div id="backendLog" class="log" style="display:none;"></div>
+    </div>
+
+    <!-- Test 3: LiveKit Token -->
+    <div class="test-section">
+      <h2>🔑 Test 3: LiveKit Token</h2>
+      <div id="tokenStatus" class="status pending">⏳ Not tested</div>
+      <input type="text" id="roomInput" placeholder="Room name" value="frontdesk-demo" style="padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; margin-right: 8px; width: 200px;">
+      <button onclick="testToken()">Get Token</button>
+      <div id="tokenLog" class="log" style="display:none;"></div>
+    </div>
+
+    <!-- Checklist -->
+    <div class="test-section">
+      <h2>✅ Diagnostic Checklist</h2>
+      <div class="checklist">
+        <div id="check1" class="check-item pending">⏳ Microphone permission</div>
+        <div id="check2" class="check-item pending">⏳ Audio device detected</div>
+        <div id="check3" class="check-item pending">⏳ Backend server running</div>
+        <div id="check4" class="check-item pending">⏳ LiveKit token endpoint works</div>
+        <div id="check5" class="check-item pending">⏳ LiveKit server reachable</div>
+      </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="test-section" style="border-left-color: #f59e0b;">
+      <h2>📋 What To Do If Tests Fail</h2>
+      <p style="margin-bottom: 12px;"><strong>Microphone test fails:</strong></p>
+      <ol style="margin-left: 20px; margin-bottom: 16px; line-height: 1.8;">
+        <li>Check browser permissions (click 🔒 in address bar)</li>
+        <li>Check Windows Settings → Privacy → Microphone</li>
+        <li>Close other apps using microphone (Zoom, Teams)</li>
+      </ol>
+      
+      <p style="margin-bottom: 12px;"><strong>Backend test fails:</strong></p>
+      <ol style="margin-left: 20px; margin-bottom: 16px; line-height: 1.8;">
+        <li>Start backend: <code>uvicorn main:app --reload</code></li>
+        <li>Check it runs on <code>http://localhost:8000</code></li>
+      </ol>
+      
+      <p style="margin-bottom: 12px;"><strong>Token test fails:</strong></p>
+      <ol style="margin-left: 20px; line-height: 1.8;">
+        <li>Verify backend has LiveKit credentials configured</li>
+        <li>Check LiveKit server is running</li>
+        <li>Test token endpoint manually: <code>curl localhost:8000/livekit/token</code></li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    let audioContext = null;
+    let analyser = null;
+    let microphone = null;
+    let rafId = null;
+
+    async function testMicrophone() {
+      const status = document.getElementById('micStatus');
+      const log = document.getElementById('micLog');
+      const volumeMeter = document.getElementById('volumeMeter');
+      
+      log.style.display = 'block';
+      volumeMeter.style.display = 'block';
+      log.innerHTML = '';
+      
+      addLog(log, 'info', '🎤 Requesting microphone access...');
+      status.className = 'status pending';
+      status.textContent = '⏳ Testing...';
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        addLog(log, 'success', '✅ Microphone permission granted!');
+        updateCheck('check1', true, 'Microphone permission granted');
+        
+        // Get audio tracks
+        const tracks = stream.getAudioTracks();
+        addLog(log, 'info', `📻 Audio tracks found: ${tracks.length}`);
+        tracks.forEach((track, i) => {
+          addLog(log, 'info', `  Track ${i+1}: ${track.label}`);
+        });
+        
+        if (tracks.length > 0) {
+          updateCheck('check2', true, `Audio device: ${tracks[0].label}`);
+        }
+        
+        // Set up audio context for volume meter
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+        analyser.fftSize = 256;
+        
+        addLog(log, 'info', '🎚️ Monitoring audio level... Speak into microphone!');
+        
+        // Start volume monitoring
+        monitorVolume();
+        
+        status.className = 'status success';
+        status.textContent = '✅ Working';
+        
+        // Stop after 10 seconds
+        setTimeout(() => {
+          if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            if (rafId) cancelAnimationFrame(rafId);
+            addLog(log, 'info', '⏹️ Test stopped');
+            volumeMeter.style.display = 'none';
+          }
+        }, 10000);
+        
+      } catch (err) {
+        addLog(log, 'error', '❌ Microphone access denied: ' + err.message);
+        status.className = 'status error';
+        status.textContent = '❌ Failed';
+        updateCheck('check1', false, 'Microphone permission denied');
+      }
+    }
+    
+    function monitorVolume() {
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      const volumeBar = document.getElementById('volumeBar');
+      
+      function update() {
+        analyser.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+        const percent = (average / 255) * 100;
+        volumeBar.style.width = percent + '%';
+        rafId = requestAnimationFrame(update);
+      }
+      
+      update();
+    }
+    
+    async function testBackend() {
+      const status = document.getElementById('backendStatus');
+      const log = document.getElementById('backendLog');
+      
+      log.style.display = 'block';
+      log.innerHTML = '';
+      
+      addLog(log, 'info', '🔌 Testing backend connection...');
+      status.className = 'status pending';
+      status.textContent = '⏳ Testing...';
+      
+      try {
+        const response = await fetch('http://localhost:8000/health');
+        const data = await response.json();
+        
+        addLog(log, 'success', '✅ Backend is running!');
+        addLog(log, 'info', `Status: ${data.status}`);
+        addLog(log, 'info', `Response: ${JSON.stringify(data, null, 2)}`);
+        
+        status.className = 'status success';
+        status.textContent = '✅ Connected';
+        updateCheck('check3', true, 'Backend server running');
+        
+      } catch (err) {
+        addLog(log, 'error', '❌ Backend connection failed: ' + err.message);
+        addLog(log, 'warning', '⚠️ Make sure backend is running on http://localhost:8000');
+        addLog(log, 'info', 'Start with: uvicorn main:app --reload');
+        
+        status.className = 'status error';
+        status.textContent = '❌ Failed';
+        updateCheck('check3', false, 'Backend not responding');
+      }
+    }
+    
+    async function testToken() {
+      const status = document.getElementById('tokenStatus');
+      const log = document.getElementById('tokenLog');
+      const room = document.getElementById('roomInput').value;
+      
+      log.style.display = 'block';
+      log.innerHTML = '';
+      
+      addLog(log, 'info', '🔑 Requesting LiveKit token...');
+      status.className = 'status pending';
+      status.textContent = '⏳ Testing...';
+      
+      try {
+        const response = await fetch(`http://localhost:8000/livekit/token?identity=test-user&room=${room}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        addLog(log, 'success', '✅ Token received!');
+        addLog(log, 'info', `Identity: ${data.identity}`);
+        addLog(log, 'info', `Room: ${data.room}`);
+        addLog(log, 'info', `URL: ${data.url}`);
+        addLog(log, 'info', `Token: ${data.token.substring(0, 50)}...`);
+        
+        status.className = 'status success';
+        status.textContent = '✅ Working';
+        updateCheck('check4', true, 'LiveKit token endpoint works');
+        updateCheck('check5', true, `LiveKit server: ${data.url}`);
+        
+      } catch (err) {
+        addLog(log, 'error', '❌ Token request failed: ' + err.message);
+        addLog(log, 'warning', '⚠️ Check backend LiveKit configuration');
+        
+        status.className = 'status error';
+        status.textContent = '❌ Failed';
+        updateCheck('check4', false, 'Token endpoint not working');
+      }
+    }
+    
+    function addLog(element, type, message) {
+      const line = document.createElement('div');
+      line.className = `log-line ${type}`;
+      line.textContent = message;
+      element.appendChild(line);
+      element.scrollTop = element.scrollHeight;
+    }
+    
+    function updateCheck(id, passed, message) {
+      const check = document.getElementById(id);
+      check.className = `check-item ${passed ? 'checked' : 'unchecked'}`;
+      check.textContent = (passed ? '✅ ' : '❌ ') + message;
+    }
+  </script>
+</body>
+</html>
