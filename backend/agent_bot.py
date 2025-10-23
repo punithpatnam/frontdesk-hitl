@@ -68,10 +68,10 @@ def is_relevant_to_salon(question: str) -> bool:
 async def robust_say(s: 'AgentSession', msg: str, attempts: int = 3, base_delay: float = 0.2):
     """Safely speak via a session with basic state checks and retries.
 
-    This helper avoids hammering session.say when the session has already
-    closed (which was causing repeated 'AgentSession isn't running' retries).
-    It performs a quick check of common session flags and bails early if the
-    session isn't active.
+    This function implements robust message delivery with exponential backoff
+    to handle temporary connection issues and session state changes. It prevents
+    attempts to send messages to disconnected sessions and provides retry logic
+    for transient failures.
     """
     # Quick pre-check for common 'closed' indicators to avoid noisy retries
     try:
@@ -90,12 +90,12 @@ async def robust_say(s: 'AgentSession', msg: str, attempts: int = 3, base_delay:
         print(f"[agent_bot][robust_say] session attrs: {session_attrs}")
         # If any indicator says closed/not running, skip speaking
         if is_active is False or closed is True or _closed is True or running is False:
-            print(f"⚠️ robust_say: session not active/closed; skipping speak: {repr(msg)[:120]}")
+            print(f" robust_say: session not active/closed; skipping speak: {repr(msg)[:120]}")
             return False
         # If all indicators are None, assume session is open and allow speaking
         # (LiveKit sometimes leaves these None at startup)
     except Exception as ex:
-        print(f"⚠️ robust_say: failed to introspect session state: {ex}")
+        print(f" robust_say: failed to introspect session state: {ex}")
         # If we can't introspect session state, continue with attempts below
         pass
 
@@ -103,29 +103,29 @@ async def robust_say(s: 'AgentSession', msg: str, attempts: int = 3, base_delay:
     for i in range(attempts):
         try:
             await s.say(msg)
-            print(f"✅ robust_say succeeded: {repr(msg)[:120]}")
+            print(f" robust_say succeeded: {repr(msg)[:120]}")
             return True
         except Exception as e:
             import traceback as _tb
-            print(f"❌ robust_say attempt {i+1} raised exception: {e}")
+            print(f" robust_say attempt {i+1} raised exception: {e}")
             _tb.print_exc()
             last_exc = e
             # If the session is explicitly not running, bail immediately
             msg_text = str(e)
             if 'AgentSession' in msg_text and 'not running' in msg_text or "isn't running" in msg_text:
-                print(f"⚠️ robust_say: session not running: {e}")
+                print(f" robust_say: session not running: {e}")
                 return False
             try:
                 await asyncio.sleep(base_delay * (2 ** i))
             except Exception:
                 pass
-    print(f"❌ robust_say failed after {attempts} attempts: {last_exc}")
+    print(f" robust_say failed after {attempts} attempts: {last_exc}")
     return False
 
 # Set environment variables
 # Note: OPENAI_API_KEY should be set in your environment or .env file
 if not os.getenv("OPENAI_API_KEY"):
-    print("⚠️  Warning: OPENAI_API_KEY not found in environment variables")
+    print("  Warning: OPENAI_API_KEY not found in environment variables")
     print("   Please set OPENAI_API_KEY in your .env file or environment")
     
 os.environ["LIVEKIT_API_KEY"] = settings.LIVEKIT_API_KEY
@@ -136,14 +136,17 @@ os.environ["LIVEKIT_URL"] = settings.LIVEKIT_URL
 @function_tool(description="Search the salon's knowledge base for answers to customer questions about services, hours, pricing, appointments, etc.")
 async def search_knowledge_base(question: str) -> dict:
     """
-    Search the knowledge base for an answer to the customer's question.
-    Uses exact text matching for fast and reliable results.
+    Search the salon's knowledge base for answers to customer questions.
+    
+    This function provides the primary interface for the AI agent to find
+    answers to customer queries. It uses exact text matching for fast and
+    reliable results, ensuring consistent responses for known questions.
 
     Args:
-        question: The customer's question
+        question: The customer's question about salon services, hours, pricing, etc.
 
     Returns:
-        dict: Contains 'found', 'answer', and 'confidence' keys
+        dict: Contains 'found' (boolean), 'answer' (string), and 'confidence' (float) keys
     """
     # Use smart_lookup (exact matching only)
     result = kb_service.smart_lookup(question)
@@ -211,14 +214,14 @@ async def escalate_to_supervisor(customer_id: str, question: str, session: 'Agen
     import asyncio
     from app.repositories.firestore_client import get_db
     
-    print(f"📢 Escalating to supervisor: {question}")
+    print(f"Escalating to supervisor: {question}")
     # Inform caller to hold while escalating
     print("Please hold while I connect you to our supervisor for the answer.")
     
     try:
         # Create help request
         help_request_id = help_requests_repo.create_pending(customer_id, question)
-        print(f"✅ Created help request: {help_request_id}")
+        print(f" Created help request: {help_request_id}")
         try:
             help_request_session_map[help_request_id] = customer_id
             # Capture the session object if provided so the listener can speak
@@ -243,7 +246,7 @@ async def escalate_to_supervisor(customer_id: str, question: str, session: 'Agen
         async def _handle_resolution_async(doc_dict, h_id: str):
             try:
                 supervisor_answer = doc_dict.get("supervisor_answer", "")
-                print(f"✅ Supervisor answered (listener): {supervisor_answer}")
+                print(f" Supervisor answered (listener): {supervisor_answer}")
                 # Upsert into KB
                 kb_id = kb_service.upsert_supervisor_answer(question_raw=doc_dict.get("question"), answer=supervisor_answer)
                 # Emit events
@@ -268,9 +271,9 @@ async def escalate_to_supervisor(customer_id: str, question: str, session: 'Agen
                             if lst is not None:
                                 try:
                                     lst.unsubscribe()
-                                    print(f"✅ Unsubscribed Firestore listener for help_request {h_id} (no active session)")
+                                    print(f" Unsubscribed Firestore listener for help_request {h_id} (no active session)")
                                 except Exception as ue:
-                                    print(f"⚠️ Failed to unsubscribe listener for {h_id}: {ue}")
+                                    print(f" Failed to unsubscribe listener for {h_id}: {ue}")
                         except Exception:
                             pass
                     else:
@@ -290,40 +293,40 @@ async def escalate_to_supervisor(customer_id: str, question: str, session: 'Agen
                                     except Exception:
                                         exc = None
                                     if exc:
-                                        print(f"❌ robust_say task for help_request {h_id} raised: {exc}")
+                                        print(f" robust_say task for help_request {h_id} raised: {exc}")
                                     # Unsubscribe listener now that the followup attempt finished
                                     try:
                                         lst = help_request_listeners.pop(h_id, None)
                                         if lst is not None:
                                             try:
                                                 lst.unsubscribe()
-                                                print(f"✅ Unsubscribed Firestore listener for help_request {h_id} (after speak)")
+                                                print(f" Unsubscribed Firestore listener for help_request {h_id} (after speak)")
                                             except Exception as ue:
-                                                print(f"⚠️ Failed to unsubscribe listener for {h_id}: {ue}")
+                                                print(f" Failed to unsubscribe listener for {h_id}: {ue}")
                                     except Exception:
                                         pass
                                 except Exception as e:
-                                    print(f"❌ error in robust_say done-callback: {e}")
+                                    print(f" error in robust_say done-callback: {e}")
 
                             try:
                                 task.add_done_callback(_on_task_done)
                             except Exception as e:
-                                print(f"⚠️ Could not add done callback to robust_say task: {e}")
+                                print(f" Could not add done callback to robust_say task: {e}")
                         except Exception as e:
-                            print(f"❌ failed to schedule background robust_say: {e}")
+                            print(f" failed to schedule background robust_say: {e}")
                 except Exception as e:
-                    print(f"❌ error while attempting proactive followup in listener: {e}")
+                    print(f" error while attempting proactive followup in listener: {e}")
             except Exception as e:
-                print(f"❌ error in handle_resolution_async: {e}")
+                print(f" error in handle_resolution_async: {e}")
                                     # Unsubscribe the Firestore listener for this help_request if we registered one
             try:
                 lst = help_request_listeners.pop(h_id, None)
                 if lst is not None:
                     try:
                         lst.unsubscribe()
-                        print(f"✅ Unsubscribed Firestore listener for help_request {h_id}")
+                        print(f" Unsubscribed Firestore listener for help_request {h_id}")
                     except Exception as ue:
-                        print(f"⚠️ Failed to unsubscribe listener for {h_id}: {ue}")
+                        print(f" Failed to unsubscribe listener for {h_id}: {ue}")
             except Exception:
                 pass
             # Also cleanup any captured session object for this help request
@@ -354,18 +357,18 @@ async def escalate_to_supervisor(customer_id: str, question: str, session: 'Agen
                         try:
                             loop.call_soon_threadsafe(asyncio.create_task, _handle_resolution_async(docd, help_request_id))
                         except Exception as sce:
-                            print(f"❌ failed to schedule resolution task from snapshot callback: {sce}")
+                            print(f" failed to schedule resolution task from snapshot callback: {sce}")
                 except Exception as e:
-                    print(f"❌ error in Firestore snapshot callback: {e}")
+                    print(f" error in Firestore snapshot callback: {e}")
 
             listener = doc_ref.on_snapshot(_on_snapshot)
             try:
                 help_request_listeners[help_request_id] = listener
             except Exception:
                 pass
-            print(f"✅ Registered Firestore on_snapshot listener for help_request {help_request_id}")
+            print(f" Registered Firestore on_snapshot listener for help_request {help_request_id}")
         except Exception as e:
-            print(f"⚠️ Failed to register Firestore on_snapshot listener (falling back to polling): {e}")
+            print(f" Failed to register Firestore on_snapshot listener (falling back to polling): {e}")
 
             # Start background polling task so the agent can speak immediately
             async def _background_poll(help_id: str, cust_id: str, ques: str):
@@ -393,7 +396,7 @@ async def escalate_to_supervisor(customer_id: str, question: str, session: 'Agen
                             doc = snap.to_dict()
                             if doc.get("status") == "resolved":
                                 supervisor_answer = doc.get("supervisor_answer", "")
-                                print(f"✅ Supervisor answered (background): {supervisor_answer}")
+                                print(f" Supervisor answered (background): {supervisor_answer}")
                                 kb_id = kb_service.upsert_supervisor_answer(question_raw=doc["question"], answer=supervisor_answer)
                                 from app.utils.events import emit_event as _emit
                                 _emit("help_request.resolved", {"resolver": doc.get("resolver", ""), "answer": supervisor_answer, "kb_id": kb_id}, help_id)
@@ -415,13 +418,13 @@ async def escalate_to_supervisor(customer_id: str, question: str, session: 'Agen
                                             _asyncio.get_event_loop().create_task(robust_say(sess, followup_text))
                                             print(f"[agent_bot] scheduled background robust_say for customer {chosen_cust}")
                                         except Exception as sch_err:
-                                            print(f"❌ failed to schedule proactive followup: {sch_err}")
+                                            print(f" failed to schedule proactive followup: {sch_err}")
                                 except Exception as e:
-                                    print(f"❌ error while attempting proactive followup: {e}")
+                                    print(f" error while attempting proactive followup: {e}")
                                 return
-                    print(f"⏱️ Background poll timeout for help_request {help_id}")
+                    print(f" Background poll timeout for help_request {help_id}")
                 except Exception as be:
-                    print(f"❌ Background poll error: {be}")
+                    print(f" Background poll error: {be}")
 
             try:
                 asyncio.get_event_loop().create_task(_background_poll(help_request_id, customer_id, question))
@@ -431,15 +434,15 @@ async def escalate_to_supervisor(customer_id: str, question: str, session: 'Agen
         # Return a simple string so the agent will vocalize it immediately
         return "I've sent your question to our supervisor. Please hold while I check with them and get back to you shortly."
     except Exception as e:
-        print(f"❌ Error creating help request: {e}")
+        print(f" Error creating help request: {e}")
         return "Error creating help request. Please try again."
 
 
 async def entrypoint(ctx: JobContext):
     """Entry point for each LiveKit room connection"""
     
-    print(f"🎯 Agent job received for room: {ctx.room.name}")
-    print(f"🎯 Job ID: {ctx.job.id}")
+    print(f" Agent job received for room: {ctx.room.name}")
+    print(f" Job ID: {ctx.job.id}")
     
     # --- Cleanup any stale session/help request mappings for this job/customer ---
     customer_id = f"{ctx.job.id}"
@@ -487,30 +490,30 @@ async def entrypoint(ctx: JobContext):
         connect_opts.auto_subscribe = AutoSubscribe.AUDIO_ONLY
         connect_opts.options = options
         await ctx.connect(connect_opts)
-        print(f"✅ Connected with RoomConnectOptions (close_on_disconnect=False)")
+        print(f" Connected with RoomConnectOptions (close_on_disconnect=False)")
     except Exception as e1:
-        print(f"⚠️ Could not use RoomConnectOptions: {e1}")
+        print(f" Could not use RoomConnectOptions: {e1}")
         try:
             options = RoomOptions()
             if hasattr(options, 'close_on_disconnect'):
                 options.close_on_disconnect = False
             await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY, options=options)
-            print("✅ Connected with RoomOptions (close_on_disconnect=False)")
+            print(" Connected with RoomOptions (close_on_disconnect=False)")
         except Exception as e2:
-            print(f"⚠️ Could not use RoomOptions: {e2}")
+            print(f" Could not use RoomOptions: {e2}")
             try:
                 await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
                 if hasattr(ctx.room, 'options') and hasattr(ctx.room.options, 'close_on_disconnect'):
                     ctx.room.options.close_on_disconnect = False
-                    print("✅ Set close_on_disconnect=False on room.options")
+                    print(" Set close_on_disconnect=False on room.options")
                 elif hasattr(ctx.room, 'close_on_disconnect'):
                     ctx.room.close_on_disconnect = False
-                    print("✅ Set close_on_disconnect=False directly on room")
-                print(f"✅ Connected to room {ctx.room.name} with basic connect")
+                    print(" Set close_on_disconnect=False directly on room")
+                print(f" Connected to room {ctx.room.name} with basic connect")
             except Exception as e3:
-                print(f"⚠️ Failed to set close_on_disconnect: {e3}")
+                print(f" Failed to set close_on_disconnect: {e3}")
                 await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-                print(f"✅ Connected to room {ctx.room.name} with fallback connect")
+                print(f" Connected to room {ctx.room.name} with fallback connect")
     
     # Extract customer ID from room participant (or use a default).
     # Use the job id to create a customer identifier that is unique per job
@@ -585,7 +588,7 @@ Remember: Always use `answer_from_kb_or_escalate` — do not invent or hallucina
 
     # Start the agent session
     await session.start(agent=agent, room=ctx.room)
-    print(f"✅ Agent session started (LLM disabled for deterministic replies)")
+    print(f" Agent session started (LLM disabled for deterministic replies)")
     # Register this session immediately so background tasks (supervisor followups)
     # can proactively speak to the customer if they are still connected. Register
     # early to reduce races where listeners resolve before the mapping exists.
@@ -641,7 +644,7 @@ Remember: Always use `answer_from_kb_or_escalate` — do not invent or hallucina
             res = await robust_say(session, greet_text)
             print(f"[agent_bot] greeting robust_say returned: {res}")
     except Exception:
-        print("⚠️ session.say failed for greeting; continuing")
+        print(" session.say failed for greeting; continuing")
 
     # Register this session so background tasks (supervisor followups) can
     # proactively speak to the customer if they are still connected.
@@ -697,14 +700,18 @@ Remember: Always use `answer_from_kb_or_escalate` — do not invent or hallucina
     # Handler: called whenever the session receives a user transcript
     async def _on_transcript(evt):
         try:
+            print(f"[agent_bot] DEBUG: Transcript handler called with event: {type(evt)}")
             # evt may be an object with attributes or a dict-like structure
             text = None
             if isinstance(evt, dict):
                 text = evt.get("user_transcript") or evt.get("text") or evt.get("transcript")
+                print(f"[agent_bot] DEBUG: Dict event, extracted text: {text}")
             else:
                 text = getattr(evt, "user_transcript", None) or getattr(evt, "text", None) or getattr(evt, "transcript", None)
+                print(f"[agent_bot] DEBUG: Object event, extracted text: {text}")
 
             if not text:
+                print(f"[agent_bot] DEBUG: No text found in transcript event")
                 return
 
             print(f"[agent_bot] Transcript event received: {text}")
@@ -724,7 +731,9 @@ Remember: Always use `answer_from_kb_or_escalate` — do not invent or hallucina
                 return
 
             # Call authoritative tool directly to avoid LLM hallucination
+            print(f"[agent_bot] DEBUG: Calling answer_from_kb_or_escalate with question: '{text}'")
             reply = await answer_from_kb_or_escalate(customer_id=customer_id, question=text, session=session)
+            print(f"[agent_bot] DEBUG: Got reply from answer_from_kb_or_escalate: '{reply}'")
 
             # Speak the authoritative reply deterministically (non-blocking)
             try:
@@ -737,11 +746,11 @@ Remember: Always use `answer_from_kb_or_escalate` — do not invent or hallucina
                     try:
                         _asyncio.ensure_future(robust_say(session, reply))
                     except Exception as se:
-                        print(f"❌ Failed to schedule robust speak task: {se}; reply was: {reply}")
+                        print(f" Failed to schedule robust speak task: {se}; reply was: {reply}")
             except Exception as se:
-                print(f"❌ session.say failed to schedule: {se}; reply was: {reply}")
+                print(f" session.say failed to schedule: {se}; reply was: {reply}")
         except Exception as e:
-            print(f"❌ Error in transcript handler: {e}")
+            print(f" Error in transcript handler: {e}")
 
     # The `.on()` API requires a synchronous callback. Provide a small
     # synchronous wrapper that schedules the async handler via

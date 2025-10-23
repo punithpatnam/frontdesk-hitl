@@ -1,31 +1,58 @@
+/**
+ * LiveKit Voice Panel Component
+ * 
+ * This component provides a complete voice communication interface using LiveKit
+ * for real-time audio/video communication with AI agents. It handles room
+ * connection, microphone management, and real-time transcription.
+ * 
+ * Key features:
+ * - LiveKit room connection and management
+ * - Microphone permission handling
+ * - Real-time audio streaming
+ * - Agent detection and status monitoring
+ * - Conversation transcription
+ * - Call state management
+ */
+
 import { useState, useEffect, useRef } from "react";
 import { Room, RoomEvent, Track } from "livekit-client";
 import { getLivekitToken } from "@/api/livekit";
 
+/**
+ * Call state enumeration for tracking connection status
+ */
 type CallState = "idle" | "connecting" | "talking" | "onHold" | "resolved" | "error";
 
+/**
+ * LiveKit voice communication panel component.
+ * 
+ * Provides real-time voice communication capabilities with AI agents
+ * through LiveKit's WebRTC infrastructure.
+ * 
+ * @returns JSX.Element - The complete voice communication interface
+ */
 export function LiveKitPanel() {
-  // Room configuration
+  // Room configuration state
   const [identity, setIdentity] = useState(`caller-${Date.now()}`);
   const [roomName, setRoomName] = useState("frontdesk-demo");
   
-  // Connection state
+  // Connection and call state management
   const [connected, setConnected] = useState(false);
   const [callState, setCallState] = useState<CallState>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   
-  // LiveKit room instance
+  // LiveKit room instance reference for cleanup
   const roomRef = useRef<Room | null>(null);
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   
-  // Agent detection
+  // Agent presence and activity detection
   const [agentConnected, setAgentConnected] = useState(false);
   const [agentSpeaking, setAgentSpeaking] = useState(false);
   
-  // Transcript/conversation history
+  // Conversation transcript storage
   const [transcript, setTranscript] = useState<Array<{ speaker: string; message: string }>>([]);
 
-  // Cleanup on unmount
+  // Component cleanup on unmount to prevent memory leaks
   useEffect(() => {
     return () => {
       if (roomRef.current) {
@@ -35,12 +62,21 @@ export function LiveKitPanel() {
     };
   }, []);
 
-  // Helper to add transcript
+  /**
+   * Adds a new message to the conversation transcript.
+   * 
+   * @param speaker - The speaker identifier (e.g., "User", "Agent", "System")
+   * @param message - The message content to add to the transcript
+   */
   const addToTranscript = (speaker: string, message: string) => {
     setTranscript(prev => [...prev, { speaker, message }]);
   };
 
-  // Ensure/resume AudioContext in a user gesture so browsers allow audio playback/capture
+  /**
+   * Ensures the browser's AudioContext is running for audio playback/capture.
+   * This is required by modern browsers to prevent autoplay restrictions.
+   * Must be called within a user gesture to be effective.
+   */
   async function ensureAudioContextRunning(): Promise<void> {
     try {
       const win = window as unknown as { AudioContext?: unknown; webkitAudioContext?: unknown; livekitAudioContext?: unknown };
@@ -68,15 +104,18 @@ export function LiveKitPanel() {
       
       // Check microphone permissions first
       try {
-        console.log("🎤 Requesting microphone permission...");
+        // Request microphone permission for voice communication
+        console.log("Requesting microphone permission...");
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        console.log("✅ Microphone permission granted");
+        // Microphone permission successfully granted
+        console.log("Microphone permission granted");
         addToTranscript("System", "Microphone access granted");
         
         // Stop the test stream
         stream.getTracks().forEach(track => track.stop());
       } catch (permErr) {
-        console.error("❌ Microphone permission denied:", permErr);
+        // Microphone permission denied - show error to user
+        console.error("Microphone permission denied:", permErr);
         setCallState("error");
         setStatusMessage("Microphone access denied");
         addToTranscript("System", "ERROR: Microphone permission denied");
@@ -84,9 +123,11 @@ export function LiveKitPanel() {
       }
       
       // Get token from backend
-      console.log(`🔑 Requesting token for ${identity} in room ${roomName}...`);
+      // Request LiveKit token for authentication
+      console.log(`Requesting token for ${identity} in room ${roomName}...`);
       const tokenData = await getLivekitToken({ identity, room: roomName });
-      console.log("✅ Token received:", { url: tokenData.url, room: tokenData.room, identity: tokenData.identity });
+      // Successfully received authentication token
+      console.log("Token received:", { url: tokenData.url, room: tokenData.room, identity: tokenData.identity });
       addToTranscript("System", `Joining room: ${tokenData.room}`);
       
       // Create LiveKit room
@@ -102,31 +143,60 @@ export function LiveKitPanel() {
 
       // Set up event listeners
       livekitRoom.on(RoomEvent.Connected, () => {
-        console.log("✅ Connected to LiveKit room");
-        console.log("👥 Local participant:", livekitRoom.localParticipant.identity);
+        // Successfully connected to LiveKit room
+        console.log("Connected to LiveKit room");
+        // Log local participant information for debugging
+        console.log("Local participant:", livekitRoom.localParticipant.identity);
         setConnected(true);
         setCallState("talking");
         setStatusMessage("Connected - Speak to AI Agent");
-        addToTranscript("System", "✅ Connected to voice room");
+        addToTranscript("System", "Connected to voice room");
+        
+        // Dispatch call state change event
+        window.dispatchEvent(new CustomEvent('callStateChange', {
+          detail: {
+            isActive: true,
+            isConnected: true,
+            isMuted: !isMicEnabled,
+            callDuration: 0,
+            customerId: identity,
+            roomName: roomName
+          }
+        }));
       });
 
       livekitRoom.on(RoomEvent.Disconnected, () => {
-        console.log("❌ Disconnected from LiveKit room");
+        // Disconnected from LiveKit room
+        console.log("Disconnected from LiveKit room");
         setConnected(false);
         setCallState("idle");
         setStatusMessage("");
         setAgentConnected(false);
         addToTranscript("System", "Disconnected from call");
+        
+        // Dispatch call state change event
+        window.dispatchEvent(new CustomEvent('callStateChange', {
+          detail: {
+            isActive: false,
+            isConnected: false,
+            isMuted: false,
+            callDuration: 0,
+            customerId: identity,
+            roomName: roomName
+          }
+        }));
       });
 
       livekitRoom.on(RoomEvent.Reconnecting, () => {
-        console.log("🔄 Reconnecting...");
+        // Attempting to reconnect to LiveKit room
+        console.log("Reconnecting...");
         setStatusMessage("Reconnecting...");
         setCallState("connecting");
       });
 
       livekitRoom.on(RoomEvent.Reconnected, () => {
-        console.log("✅ Reconnected");
+        // Successfully reconnected to LiveKit room
+        console.log("Reconnected");
         setStatusMessage("Reconnected - Continue speaking");
         setCallState("talking");
         addToTranscript("System", "Reconnected to call");
@@ -141,11 +211,11 @@ export function LiveKitPanel() {
         
         // Handle audio tracks (agent's voice)
         if (track.kind === Track.Kind.Audio) {
-          console.log("🔊 Agent audio track received");
+          console.log(" Agent audio track received");
           setAgentSpeaking(true);
           
           if (participant.identity.includes('agent')) {
-            setStatusMessage("🗣️ AI Agent is speaking...");
+            setStatusMessage(" AI Agent is speaking...");
             addToTranscript("AI Agent", "Speaking...");
           }
           
@@ -155,16 +225,16 @@ export function LiveKitPanel() {
           audioElement.volume = 1.0;
           
           audioElement.play().then(() => {
-            console.log("✅ Agent audio playing");
+            console.log(" Agent audio playing");
           }).catch(err => {
-            console.warn("⚠️ Audio autoplay blocked:", err);
-            setStatusMessage("🔊 Click anywhere to hear AI Agent");
+            console.warn(" Audio autoplay blocked:", err);
+            setStatusMessage(" Click anywhere to hear AI Agent");
             
             // Fallback: play on user interaction
             const enableAudio = () => {
               audioElement.play().then(() => {
-                console.log("✅ Audio enabled after user interaction");
-                setStatusMessage("🗣️ AI Agent is speaking...");
+                console.log(" Audio enabled after user interaction");
+                setStatusMessage(" AI Agent is speaking...");
               }).catch(e => console.error("Audio play failed:", e));
             };
             
@@ -186,7 +256,7 @@ export function LiveKitPanel() {
         
         if (track.kind === Track.Kind.Audio && participant.identity.includes('agent')) {
           setAgentSpeaking(false);
-          setStatusMessage("✅ Your turn - Speak now");
+          setStatusMessage(" Your turn - Speak now");
         }
       });
 
@@ -207,7 +277,7 @@ export function LiveKitPanel() {
         
         if (participant.identity.includes('agent')) {
           setAgentConnected(false);
-          setStatusMessage("⚠️ AI Agent disconnected");
+          setStatusMessage(" AI Agent disconnected");
           addToTranscript("System", "AI Agent left the call");
         } else {
           addToTranscript("System", `${participant.identity} left`);
@@ -219,7 +289,7 @@ export function LiveKitPanel() {
         console.log("📤 Local track published:", publication.kind, publication.source);
         
         if (publication.kind === Track.Kind.Audio) {
-          addToTranscript("System", "🎤 Your microphone is active");
+          addToTranscript("System", "Your microphone is active");
         }
       });
       
@@ -238,7 +308,7 @@ export function LiveKitPanel() {
             addToTranscript("AI Agent", "Please hold while I check with my supervisor...");
           } else if (data.type === "resolved") {
             setCallState("resolved");
-            setStatusMessage("✅ Question resolved!");
+            setStatusMessage(" Question resolved!");
             addToTranscript("System", "Your question has been answered");
           } else if (data.type === "transcription" && data.text) {
             // Add transcribed text to conversation
@@ -254,7 +324,7 @@ export function LiveKitPanel() {
       console.log("🔗 Room connection established");
 
       // Enable microphone and publish audio track
-      console.log("🎙️ Enabling microphone...");
+      console.log(" Enabling microphone...");
       await livekitRoom.localParticipant.setMicrophoneEnabled(true);
       setIsMicEnabled(true);
 
@@ -263,9 +333,9 @@ export function LiveKitPanel() {
       // Log microphone track info
       const micTrack = livekitRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
       if (micTrack) {
-        console.log("✅ Microphone track published:", micTrack.track?.sid);
+        console.log(" Microphone track published:", micTrack.track?.sid);
       } else {
-        console.warn("⚠️ Microphone track not found");
+        console.warn(" Microphone track not found");
       }
       
       // Log all participants
@@ -284,7 +354,7 @@ export function LiveKitPanel() {
       }
       
     } catch (e: unknown) {
-      console.error("❌ Failed to join room:", e);
+      console.error("Failed to join room:", e);
       const errorMsg = (e as Error).message || "Failed to join room";
       setCallState("error");
       setStatusMessage(`Error: ${errorMsg}`);
@@ -295,7 +365,7 @@ export function LiveKitPanel() {
 
   function leave() {
     if (roomRef.current) {
-      console.log("📞 Leaving room...");
+      console.log("Leaving room...");
       roomRef.current.disconnect();
       roomRef.current = null;
     }
@@ -314,15 +384,27 @@ export function LiveKitPanel() {
     await roomRef.current.localParticipant.setMicrophoneEnabled(newState);
     setIsMicEnabled(newState);
     
-    console.log(`🎤 Microphone ${newState ? "enabled" : "muted"}`);
+    console.log(`Microphone ${newState ? "enabled" : "muted"}`);
     
     if (newState) {
-      setStatusMessage("🎤 Microphone ON - Speak now");
-      addToTranscript("System", "🎤 Microphone unmuted");
+      setStatusMessage("Microphone ON - Speak now");
+      addToTranscript("System", "Microphone unmuted");
     } else {
-      setStatusMessage("🔇 Microphone OFF");
-      addToTranscript("System", "🔇 Microphone muted");
+      setStatusMessage("Microphone OFF");
+      addToTranscript("System", "Microphone muted");
     }
+    
+    // Dispatch mute state change event
+    window.dispatchEvent(new CustomEvent('callStateChange', {
+      detail: {
+        isActive: connected,
+        isConnected: connected,
+        isMuted: !newState,
+        callDuration: 0,
+        customerId: identity,
+        roomName: roomName
+      }
+    }));
   }
 
   // Get status color based on call state
@@ -340,12 +422,12 @@ export function LiveKitPanel() {
   // Get call state icon
   const getCallStateIcon = () => {
     switch (callState) {
-      case "talking": return agentSpeaking ? "🗣️" : "🎤";
-      case "onHold": return "⏳";
-      case "resolved": return "✅";
-      case "error": return "❌";
-      case "connecting": return "🔄";
-      default: return "📞";
+      case "talking": return agentSpeaking ? "" : "MIC";
+      case "onHold": return "HOLD";
+      case "resolved": return "";
+      case "error": return "ERROR";
+      case "connecting": return "CONN";
+      default: return "CALL";
     }
   };
 
@@ -434,7 +516,7 @@ export function LiveKitPanel() {
             <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
               {agentConnected ? (
                 <span style={{ color: "var(--success-600)" }}>
-                  ✅ AI Agent connected{agentSpeaking ? " • Speaking..." : ""}
+ AI Agent connected{agentSpeaking ? " • Speaking..." : ""}
                 </span>
               ) : (
                 <span style={{ color: "var(--warning-600)" }}>

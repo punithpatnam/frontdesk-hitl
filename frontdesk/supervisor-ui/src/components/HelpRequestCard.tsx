@@ -14,144 +14,51 @@ export function HelpRequestCard({
   const since = timeSince(created);
 
   return (
-    <div style={{
-      background: "#ffffff",
-      border: "1px solid var(--border-light)",
-      borderRadius: 16,
-      padding: "24px",
-      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-      transition: "all 0.2s ease",
-      position: "relative"
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.08)";
-      e.currentTarget.style.borderColor = "var(--border-medium)";
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.04)";
-      e.currentTarget.style.borderColor = "var(--border-light)";
-    }}
-    >
-      {/* Status Indicator */}
-      <div style={{
-        position: "absolute",
-        top: 16,
-        right: 16,
-        display: "flex",
-        alignItems: "center",
-        gap: 6
-      }}>
-        <span className={`badge ${item.status}`} style={{
-          fontSize: "12px",
-          fontWeight: 600,
-          padding: "4px 12px",
-          borderRadius: 20
-        }}>
-          {item.status}
-        </span>
-        <div className="small mono" style={{ 
-          color: "var(--text-tertiary)",
-          fontSize: "11px",
-          fontWeight: 500
-        }}>
-          #{item.id.slice(0, 8)}
+    <div className={`help-request-card ${status}`}>
+      {/* Header */}
+      <div className="card-header">
+        <div className="request-meta">
+          <div className="customer-info">
+            <div className="customer-avatar">
+              {item.customer_id?.[0]?.toUpperCase() || '?'}
+            </div>
+            <div className="customer-details">
+              <span className="customer-id">{item.customer_id}</span>
+              <span className="request-time">{since}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="request-status">
+          <span className={`badge badge-${item.status}`}>
+            {item.status}
+          </span>
+          <span className="request-id">#{item.id.slice(0, 8)}</span>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div style={{ marginBottom: 16 }}>
-        <h3 style={{ 
-          fontWeight: 600, 
-          fontSize: "18px", 
-          marginBottom: 12, 
-          color: "#000000",
-          lineHeight: 1.4,
-          paddingRight: 120
-        }}>
+      {/* Question Content */}
+      <div className="card-content">
+        <h3 className="question-text">
           {item.question}
         </h3>
-        
-        <div style={{ 
-          display: "flex", 
-          gap: 16, 
-          alignItems: "center", 
-          flexWrap: "wrap",
-          marginBottom: 16
-        }}>
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "6px 12px",
-            background: "var(--bg-secondary)",
-            borderRadius: 8,
-            border: "1px solid var(--border-light)"
-          }}>
-            <div style={{
-              width: 6,
-              height: 6,
-              background: "#000000",
-              borderRadius: "50%"
-            }}></div>
-            <span style={{ 
-              fontSize: "13px", 
-              fontWeight: 500,
-              color: "var(--text-primary)"
-            }}>
-              {item.customer_id}
-            </span>
-          </div>
-          
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "6px 12px",
-            background: "var(--bg-secondary)",
-            borderRadius: 8,
-            border: "1px solid var(--border-light)"
-          }}>
-            <span style={{ fontSize: "12px" }}>🕒</span>
-            <span style={{ 
-              fontSize: "13px", 
-              fontWeight: 500,
-              color: "var(--text-secondary)"
-            }}>
-              {since}
-            </span>
-          </div>
-        </div>
       </div>
 
-      {status === "pending" ? (
-        <>
-          <div style={{
-            height: 1,
-            background: "var(--border-light)",
-            margin: "20px 0",
-            borderRadius: 1
-          }} />
-          <div style={{
-            padding: "20px",
-            background: "var(--bg-secondary)",
-            borderRadius: 12,
-            border: "1px solid var(--border-light)"
-          }}>
-            <h4 style={{
-              fontSize: "16px",
-              fontWeight: 600,
-              color: "#000000",
-              margin: "0 0 16px"
-            }}>
-              Resolve Request
-            </h4>
-            <ResolveForm
-              defaultResolver="supervisor-1"
-              onSubmit={(answer, resolver) => onResolve(item.id, answer, resolver)}
-            />
+      {status === "pending" && (
+        <div className="resolve-section">
+          <div className="resolve-header">
+            <h4 className="resolve-title">Resolve Request</h4>
+            <div className="resolve-indicator">
+              <div className="indicator-dot"></div>
+              <span>Needs attention</span>
+            </div>
           </div>
-        </>
-      ) : null}
+          <ResolveForm
+            defaultResolver="supervisor-1"
+            onSubmit={(answer, resolver) => onResolve(item.id, answer, resolver)}
+          />
+        </div>
+      )}
     </div>
   );
 }

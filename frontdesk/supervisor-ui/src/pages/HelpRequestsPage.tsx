@@ -72,100 +72,33 @@ export function HelpRequestsPage() {
   }
 
   return (
-    <div style={{ 
-      marginTop: 32, 
-      display: "grid", 
-      gap: 24,
-      maxWidth: "1200px",
-      margin: "32px auto 0",
-      padding: "0 20px"
-    }}>
+    <div className="page-container">
       {/* Header Section */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingBottom: 16,
-        borderBottom: "2px solid var(--border-light)"
-      }}>
-        <div>
-          <h1 style={{ 
-            fontSize: "32px", 
-            fontWeight: 800, 
-            color: "#000000",
-            margin: 0,
-            letterSpacing: "-1px"
-          }}>
-            Help Requests
-          </h1>
-          <p style={{ 
-            fontSize: "16px", 
-            color: "var(--text-secondary)", 
-            margin: "8px 0 0",
-            fontWeight: 400
-          }}>
-            Manage and resolve customer inquiries
-          </p>
-        </div>
-        
-        {loading && (
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 16px",
-            background: "var(--bg-secondary)",
-            borderRadius: 8,
-            border: "1px solid var(--border-light)"
-          }}>
-            <div style={{
-              width: 16,
-              height: 16,
-              border: "2px solid var(--border-light)",
-              borderTopColor: "#000000",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite"
-            }}></div>
-            <span style={{ fontSize: "14px", fontWeight: 500 }}>Loading...</span>
+      <div className="page-header">
+        <div className="header-content">
+          <div className="header-text">
+            <h1 className="page-title">Help Requests</h1>
+            <p className="page-subtitle">Manage and resolve customer inquiries</p>
           </div>
-        )}
+          
+          {loading && (
+            <div className="loading-indicator">
+              <div className="loading-spinner"></div>
+              <span>Loading...</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Controls Section */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 16,
-        padding: "20px",
-        background: "var(--bg-secondary)",
-        borderRadius: 12,
-        border: "1px solid var(--border-light)"
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ 
-              fontSize: "12px", 
-              fontWeight: 600, 
-              color: "var(--text-secondary)",
-              textTransform: "uppercase",
-              letterSpacing: "0.5px"
-            }}>
-              Status Filter
-            </label>
+      <div className="page-controls">
+        <div className="controls-left">
+          <div className="form-group">
+            <label className="form-label">Status Filter</label>
             <select 
               value={status} 
               onChange={e => setStatus(e.target.value as HelpRequestStatus)}
-              style={{
-                padding: "10px 16px",
-                border: "1px solid var(--border-light)",
-                borderRadius: 8,
-                background: "#ffffff",
-                fontSize: "14px",
-                fontWeight: 500,
-                minWidth: "140px",
-                cursor: "pointer"
-              }}
+              className="status-filter"
             >
               <option value="pending">Pending</option>
               <option value="resolved">Resolved</option>
@@ -174,98 +107,33 @@ export function HelpRequestsPage() {
           </div>
           
           {status === "pending" && (
-            <div style={{ 
-              display: "flex", 
-              alignItems: "center", 
-              gap: 12,
-              padding: "12px 16px",
-              background: "#ffffff",
-              borderRadius: 8,
-              border: "1px solid var(--border-light)"
-            }}>
+            <div className="auto-refresh-toggle">
               <input
                 type="checkbox"
                 checked={autoRefresh}
                 onChange={e => setAutoRefresh(e.target.checked)}
-                style={{ 
-                  cursor: "pointer",
-                  width: 16,
-                  height: 16,
-                  accentColor: "#000000"
-                }}
+                className="refresh-checkbox"
               />
-              <span style={{ 
-                fontSize: "14px", 
-                fontWeight: 500,
-                color: "var(--text-primary)"
-              }}>
-                Auto-refresh every 3s
-              </span>
+              <span className="refresh-label">Auto-refresh every 3s</span>
             </div>
           )}
         </div>
         
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "8px 12px",
-          background: "#ffffff",
-          borderRadius: 8,
-          border: "1px solid var(--border-light)"
-        }}>
-          <div style={{
-            width: 8,
-            height: 8,
-            background: status === "pending" ? "#000000" : "var(--text-tertiary)",
-            borderRadius: "50%"
-          }}></div>
-          <span style={{ 
-            fontSize: "14px", 
-            fontWeight: 600,
-            color: "var(--text-primary)"
-          }}>
-            {items.length} {status} requests
-          </span>
+        <div className="controls-right">
+          <div className="request-count">
+            <div className={`count-indicator ${status === "pending" ? "active" : ""}`}></div>
+            <span className="count-text">{items.length} {status} requests</span>
+          </div>
         </div>
       </div>
 
       {/* Requests Grid */}
-      <div style={{ display: "grid", gap: 16 }}>
+      <div className="requests-grid">
         {items?.length === 0 && !loading && (
-          <div style={{
-            textAlign: "center",
-            padding: "60px 20px",
-            background: "var(--bg-secondary)",
-            borderRadius: 12,
-            border: "1px solid var(--border-light)"
-          }}>
-            <div style={{
-              width: 48,
-              height: 48,
-              background: "var(--bg-tertiary)",
-              borderRadius: "50%",
-              margin: "0 auto 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "20px"
-            }}>
-              📋
-            </div>
-            <h3 style={{ 
-              fontSize: "18px", 
-              fontWeight: 600, 
-              color: "var(--text-primary)",
-              margin: "0 0 8px"
-            }}>
-              No {status} requests found
-            </h3>
-            <p style={{ 
-              fontSize: "14px", 
-              color: "var(--text-secondary)",
-              margin: 0
-            }}>
+          <div className="empty-state">
+            <div className="empty-icon">📋</div>
+            <h3 className="empty-title">No {status} requests found</h3>
+            <p className="empty-description">
               {status === "pending" ? "All caught up! New requests will appear here." : "No items match your current filter."}
             </p>
           </div>

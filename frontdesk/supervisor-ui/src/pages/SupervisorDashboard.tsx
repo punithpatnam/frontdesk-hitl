@@ -1,11 +1,33 @@
 
 
 
+/**
+ * Supervisor Dashboard Component
+ * 
+ * This component provides the main interface for supervisors to manage
+ * pending help requests from customers. It displays a list of pending
+ * requests and allows supervisors to provide answers that are automatically
+ * added to the knowledge base.
+ * 
+ * Key features:
+ * - Real-time polling of pending requests
+ * - Request sorting and filtering
+ * - Answer submission with resolver tracking
+ * - Toast notifications for user feedback
+ * - Responsive design with sidebar layout
+ */
+
 import { useState, useEffect } from 'react';
 import { listHelpRequests, resolveHelpRequest, type HelpRequest } from '../services/api';
 import { Toast } from '../components/Toast';
 
+/**
+ * Main supervisor dashboard component for managing help requests.
+ * 
+ * @returns JSX.Element - The complete supervisor dashboard interface
+ */
 export function SupervisorDashboard() {
+  // Component state management
   const [pendingRequests, setPendingRequests] = useState<HelpRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<HelpRequest | null>(null);
@@ -14,12 +36,18 @@ export function SupervisorDashboard() {
   const [showToast, setShowToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
 
+  // Initialize data loading and set up polling interval
   useEffect(() => {
     loadPendingRequests();
+    // Poll for new requests every 10 seconds to maintain real-time updates
     const interval = setInterval(loadPendingRequests, 10000);
     return () => clearInterval(interval);
   }, []);
 
+  /**
+   * Loads pending help requests from the API and updates component state.
+   * Handles errors gracefully with user feedback via toast notifications.
+   */
   const loadPendingRequests = async () => {
     try {
       const data = await listHelpRequests('pending', 50);
@@ -31,6 +59,10 @@ export function SupervisorDashboard() {
     }
   };
 
+  /**
+   * Handles the resolution of a help request by submitting the supervisor's answer.
+   * Validates required fields before submission and provides user feedback.
+   */
   const handleResolve = async () => {
     if (!selectedRequest || !answer || !resolver) return;
     try {

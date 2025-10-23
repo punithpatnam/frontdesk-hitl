@@ -83,7 +83,7 @@ if ($envExists -or $envLocalExists) {
         Write-Host "   ✓ $apiUrl" -ForegroundColor Green
         
         if ($apiUrl -notmatch "http://localhost:8000") {
-            Write-Host "   ⚠ WARNING: Should be http://localhost:8000" -ForegroundColor Yellow
+            Write-Host "   WARNING: Should be http://localhost:8000" -ForegroundColor Yellow
         }
     } else {
         Write-Host "   ✗ VITE_API_BASE_URL not found" -ForegroundColor Red
@@ -95,7 +95,7 @@ if ($envExists -or $envLocalExists) {
         Write-Host "   ✓ $liveKitUrl" -ForegroundColor Green
         
         if ($liveKitUrl -notmatch "wss://") {
-            Write-Host "   ⚠ WARNING: LiveKit URL should start with wss://" -ForegroundColor Yellow
+            Write-Host "   WARNING: LiveKit URL should start with wss://" -ForegroundColor Yellow
         }
     } else {
         Write-Host "   ✗ VITE_LIVEKIT_URL not found" -ForegroundColor Red
@@ -127,11 +127,11 @@ if (Test-Path $srcPath) {
             Write-Host "     - $relativePath" -ForegroundColor Gray
         }
     } else {
-        Write-Host "   ⚠ No LiveKit components found in src/" -ForegroundColor Yellow
+        Write-Host "   WARNING: No LiveKit components found in src/" -ForegroundColor Yellow
         Write-Host "   You may need to implement the LiveKit integration" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "   ⚠ src/ directory not found" -ForegroundColor Yellow
+    Write-Host "   WARNING: src/ directory not found" -ForegroundColor Yellow
 }
 Write-Host ""
 
@@ -172,7 +172,7 @@ $agentRunning = Get-Process python -ErrorAction SilentlyContinue | Where-Object 
 if ($agentRunning) {
     Write-Host "   ✓ Agent process found (PID: $($agentRunning.Id))" -ForegroundColor Green
 } else {
-    Write-Host "   ⚠ Agent may not be running" -ForegroundColor Yellow
+    Write-Host "   WARNING: Agent may not be running" -ForegroundColor Yellow
     Write-Host "   Start agent: python agent_bot.py dev" -ForegroundColor Cyan
 }
 Write-Host ""

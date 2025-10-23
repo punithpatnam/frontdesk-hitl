@@ -115,11 +115,11 @@ export function LearnedAnswersPage() {
         {items?.map((it) => (
           <div key={it.id} className="card">
             <div style={{ fontWeight:600, fontSize: "15px", color: "var(--text-primary)", marginBottom: 6 }}>
-              {it.question_raw || "Untitled"}
+              {it.question || it.question_raw || "Untitled"}
             </div>
             <div className="small" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
               <span className="badge">
-                {it.source === "supervisor" ? "👤 Supervisor" : "📚 Seed"}
+                {it.source === "supervisor" ? "Supervisor" : "Seed"}
               </span>
               <span>•</span>
               <span>Updated: {it.updated_at ? formatWhen(it.updated_at) : "N/A"}</span>
